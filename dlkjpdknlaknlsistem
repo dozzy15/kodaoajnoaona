@@ -1,0 +1,2216 @@
+-- RESET DE CONFIGURACIONES GLOBALES
+getgenv().worldState = {
+    Fullbright = false,
+    Saturation = false,
+    SaturationValue = 1.5,
+    FogColor = false,
+    AmbientColor = false,
+    FOV = false,
+    FOVValue = 70,
+}
+
+getgenv().InstantInteract = getgenv().InstantInteract or {
+    Enabled = false
+}
+
+getgenv().ClickDelete = {
+    Enabled = false,
+    DeleteKey = Enum.KeyCode.LeftAlt,
+    currentHoveredObject = nil,
+    keyPressed = false,
+    connections = {}
+}
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+
+local Spectating = false
+local SpectateConnection = nil
+
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local VirtualUser = game:GetService("VirtualUser")
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+
+-- BodyParts para dropdowns
+local BodyParts = {
+    "Head", "UpperTorso", "LowerTorso",
+    "LeftUpperArm", "LeftLowerArm",
+    "RightUpperArm", "RightLowerArm",
+    "LeftUpperLeg", "LeftLowerLeg",
+    "RightUpperLeg", "RightLowerLeg",
+    "HumanoidRootPart"
+}
+
+local Lighting = game:GetService("Lighting")
+local Camera = workspace.CurrentCamera
+
+getgenv().WorldVisuals = getgenv().WorldVisuals or {
+    SaturationEnabled = false,
+    Saturation_Value = 0.5,          -- Valary usa Value/100, default 50 → 0.5
+
+    StretchEnabled = false,
+    StretchValue = 0.7,
+
+    FogColorEnabled = false,
+    FogColor = Color3.fromRGB(255, 255, 255),
+
+    AmbientEnabled = false,
+    AmbientColor = Color3.fromRGB(255, 255, 255),
+
+    FieldOfViewEnabled = false,
+    FieldOfViewValue = 70,
+
+    Fullbright = false,
+
+	NoFog = false,
+}
+
+local WorldVisuals = getgenv().WorldVisuals
+
+-- Guardar valores originales
+local OldLightingSettings = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+}
+
+-- ColorCorrection (si no existe, créalo)
+local ColorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+if not ColorCorrection then
+    ColorCorrection = Instance.new("ColorCorrectionEffect")
+    ColorCorrection.Name = "TrapgzzCC"
+    ColorCorrection.Parent = Lighting
+end
+
+local OldSaturation = ColorCorrection.Saturation
+local OldFogColor = Lighting.FogColor
+
+-- Tint para Ambient (igual que Valary)
+local Tint = Instance.new("ColorCorrectionEffect")
+Tint.Name = "TrapgzzTint"
+Tint.Parent = Lighting
+Tint.TintColor = Color3.new(1, 1, 1)
+
+local Set_Fog, Set_Fov, Set_FullBright = true, true, true
+
+RunService:BindToRenderStep("World_Visuals", Enum.RenderPriority.Camera.Value + 1, function()
+    -- Stretch
+    if WorldVisuals.StretchEnabled then
+        Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0, WorldVisuals.StretchValue, 0, 0, 0, 1)
+    end
+
+    -- FOV
+    if WorldVisuals.FieldOfViewEnabled then
+        Set_Fov = false
+        Camera.FieldOfView = WorldVisuals.FieldOfViewValue
+    else
+        if not Set_Fov then
+            Set_Fov = true
+            Camera.FieldOfView = 70
+        end
+    end
+
+    -- Saturation
+    if WorldVisuals.SaturationEnabled then
+        ColorCorrection.Saturation = WorldVisuals.Saturation_Value
+    else
+        ColorCorrection.Saturation = OldSaturation
+    end
+
+    -- Fullbright
+    if WorldVisuals.Fullbright then
+        Set_FullBright = false
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    else
+        if not Set_FullBright then
+            Set_FullBright = true
+            Lighting.Brightness = OldLightingSettings.Brightness
+            Lighting.FogEnd = OldLightingSettings.FogEnd
+            Lighting.GlobalShadows = OldLightingSettings.GlobalShadows
+            Lighting.OutdoorAmbient = OldLightingSettings.OutdoorAmbient
+        end
+    end
+
+local Lighting = game:GetService("Lighting")
+
+getgenv().NoFogEnabled = getgenv().NoFogEnabled or false
+
+local function ApplyNoFog()
+    if not getgenv().NoFogEnabled then return end
+
+    local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+    if not atmosphere then
+        atmosphere = Instance.new("Atmosphere")
+        atmosphere.Parent = Lighting
+    end
+
+    atmosphere.Density = 0
+    atmosphere.Haze = 0
+    atmosphere.Glare = 0
+    atmosphere.Decay = 0
+    atmosphere.Color = Color3.fromRGB(255, 255, 255)
+end
+
+-- Al respawnear
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5) -- espera a que el juego ponga su fog
+    ApplyNoFog()
+end)
+
+-- Si ya tienes personaje
+if LocalPlayer.Character then
+    ApplyNoFog()
+end
+
+    -- Ambient (tint)
+    if WorldVisuals.AmbientEnabled then
+        Tint.TintColor = WorldVisuals.AmbientColor
+    else
+        Tint.TintColor = Color3.new(1, 1, 1)
+    end
+
+    -- Fog Color
+    if WorldVisuals.FogColorEnabled then
+        Set_Fog = false
+        Lighting.FogColor = WorldVisuals.FogColor
+    else
+        if not Set_Fog then
+            Set_Fog = true
+            Lighting.FogColor = OldFogColor
+        end
+    end
+end)
+
+-- ============================================================
+-- INSTANT INTERACT SYSTEM (Ultra Rápido - 1ms)
+-- ============================================================
+
+getgenv().InstantInteract = getgenv().InstantInteract or {
+    Enabled = false
+}
+local InstantInteract = getgenv().InstantInteract
+
+-- Función ultra rápida para completar interacciones
+local function completeInteraction(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") then return end
+    
+    -- Guardar configuración original
+    local originalHoldDuration = prompt.HoldDuration
+    local originalEnabled = prompt.Enabled
+    local originalLOS = prompt.RequiresLineOfSight
+    local originalMaxDist = prompt.MaxActivationDistance
+    
+    -- Configurar para interacción instantánea
+    prompt.HoldDuration = 0
+    prompt.Enabled = true
+    prompt.RequiresLineOfSight = false
+    prompt.MaxActivationDistance = 100
+    
+    -- Método 1: InputHold
+    pcall(function()
+        prompt:InputHoldBegin()
+        task.wait() -- 1 frame (~16ms) pero necesario para que el servidor lo detecte
+        prompt:InputHoldEnd()
+    end)
+    
+    -- Método 2: FireProximityPrompt (backup)
+    pcall(function()
+        fireproximityprompt(prompt)
+    end)
+    
+    -- Método 3: Replicar señal directamente
+    pcall(function()
+        if prompt.Triggered then
+            prompt.Triggered:Fire()
+        end
+    end)
+    
+    -- Restaurar configuración original (si no está en 0)
+    task.spawn(function()
+        if originalHoldDuration ~= 0 then
+            prompt.HoldDuration = originalHoldDuration
+        end
+        prompt.Enabled = originalEnabled
+        prompt.RequiresLineOfSight = originalLOS
+        prompt.MaxActivationDistance = originalMaxDist
+    end)
+end
+
+-- Hook: Interceptar cuando se empieza a mantener presionado
+local instantInteractConnection = ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt, player)
+    if player == LocalPlayer and prompt and InstantInteract.Enabled then
+        -- Completar la interacción inmediatamente
+        completeInteraction(prompt)
+    end
+end)
+
+-- Hook: Interceptar cuando se presiona tecla E (interact)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not InstantInteract.Enabled then return end
+    
+    if input.KeyCode == Enum.KeyCode.E then
+        -- Buscar prompts cercanos
+        task.spawn(function()
+            local character = LocalPlayer.Character
+            if not character then return end
+            
+            local root = character:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            
+            -- Buscar prompts en un radio de 15 studs
+            local radius = 15
+            local region = Region3.new(
+                root.Position - Vector3.new(radius, radius, radius),
+                root.Position + Vector3.new(radius, radius, radius)
+            )
+            
+            local parts = Workspace:FindPartsInRegion3(region, nil, math.huge)
+            for _, part in ipairs(parts) do
+                if part and part:IsA("BasePart") then
+                    -- Buscar prompts en esta parte y sus padres
+                    local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    if prompt and prompt:IsA("ProximityPrompt") and prompt.Enabled then
+                        completeInteraction(prompt)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- Función para habilitar/deshabilitar
+function setInstantInteract(enabled)
+    InstantInteract.Enabled = enabled
+end
+
+-- Función para forzar interacción con un prompt específico
+function forceInteract(prompt)
+    if prompt and InstantInteract.Enabled then
+        completeInteraction(prompt)
+        return true
+    end
+    return false
+end
+
+-- ============================================================
+-- SISTEMA CLICK DELETE (Con Keybind configurable)
+-- ============================================================
+do
+
+getgenv().ClickDelete = getgenv().ClickDelete or {
+    Enabled = false,
+    DeleteKey = Enum.KeyCode.LeftAlt,
+    currentHoveredObject = nil,
+    keyPressed = false,
+    connections = {}
+}
+local ClickDelete = getgenv().ClickDelete
+
+local function isProtected(obj)
+    if not obj then return false end
+    if obj.Name == "Floor" then return true end
+    local parent = obj.Parent
+    while parent do
+        if parent.Name == "Floor" then return true end
+        parent = parent.Parent
+    end
+    return false
+end
+
+local function setRedTransparent(obj)
+    if obj and obj:IsA("BasePart") then
+        if isProtected(obj) then return end
+        if not obj:GetAttribute("OriginalColor") then
+            obj:SetAttribute("OriginalColor", obj.Color)
+        end
+        if not obj:GetAttribute("OriginalTransparency") then
+            obj:SetAttribute("OriginalTransparency", obj.Transparency)
+        end
+        obj.Color = Color3.new(1, 0, 0)
+        obj.Transparency = 0.5
+    end
+end
+
+local function restoreObject(obj)
+    if obj and obj:IsA("BasePart") then
+        if isProtected(obj) then return end
+        local originalColor = obj:GetAttribute("OriginalColor")
+        local originalTransparency = obj:GetAttribute("OriginalTransparency")
+        if originalColor then
+            obj.Color = originalColor
+        end
+        if originalTransparency then
+            obj.Transparency = originalTransparency
+        end
+        obj:SetAttribute("OriginalColor", nil)
+        obj:SetAttribute("OriginalTransparency", nil)
+    end
+end
+
+getgenv().DeletedObjects = getgenv().DeletedObjects or {}
+
+local function deleteObject(obj)
+    if obj and obj:IsA("BasePart") then
+        if isProtected(obj) then return end
+        if obj:IsDescendantOf(workspace) and not obj:IsDescendantOf(LocalPlayer.Character) then
+            -- Guardar UNA COPIA LIMPIA del objeto (sin modificaciones de color/transparencia)
+            local clone = obj:Clone()
+            
+            -- Guardar el objeto con sus propiedades ORIGINALES (no las modificadas)
+            table.insert(getgenv().DeletedObjects, {
+                Name = obj.Name,
+                Parent = obj.Parent,
+                -- Guardar propiedades ORIGINALES (las que tenía antes de ser modificado)
+                Properties = {
+                    Position = obj.Position,
+                    CFrame = obj.CFrame,
+                    Size = obj.Size,
+                    -- USAR LAS PROPIEDADES GUARDADAS EN ATTRIBUTES (color y transparencia originales)
+                    Color = obj:GetAttribute("OriginalColor") or obj.Color,
+                    Transparency = obj:GetAttribute("OriginalTransparency") or obj.Transparency,
+                    Material = obj.Material,
+                    Anchored = obj.Anchored,
+                    CanCollide = obj.CanCollide,
+                },
+                -- Guardar el clon SOLO para usarlo como template, pero luego lo destruimos
+                Clone = clone
+            })
+            obj:Destroy()
+        end
+    end
+end
+
+function RestoreAllDeleted()
+    local trash = getgenv().DeletedObjects
+    if #trash == 0 then return false end
+    
+    for i = #trash, 1, -1 do
+        local data = trash[i]
+        if data and data.Clone then
+            pcall(function()
+                -- Crear un NUEVO objeto desde el clon
+                local newObj = data.Clone:Clone()
+                
+                -- Aplicar las propiedades ORIGINALES (que ya están guardadas con color/transparencia original)
+                for prop, value in pairs(data.Properties or {}) do
+                    pcall(function()
+                        newObj[prop] = value
+                    end)
+                end
+                
+                -- ELIMINAR CUALQUIER ATTRIBUTO que pueda tener (para que no se guarde nada)
+                pcall(function()
+                    newObj:SetAttribute("OriginalColor", nil)
+                    newObj:SetAttribute("OriginalTransparency", nil)
+                end)
+                
+                -- Restaurar al padre original
+                if data.Parent and data.Parent:IsA("Instance") then
+                    newObj.Parent = data.Parent
+                else
+                    newObj.Parent = workspace
+                end
+            end)
+            
+            -- Destruir el clon guardado
+            pcall(function()
+                if data.Clone then data.Clone:Destroy() end
+            end)
+        end
+    end
+    
+    getgenv().DeletedObjects = {}
+    return true
+end
+
+local clickDeleteMouse = LocalPlayer:GetMouse()
+
+local function startClickDelete()
+    -- Limpiar conexiones anteriores
+    for _, conn in ipairs(ClickDelete.connections) do
+        conn:Disconnect()
+    end
+    ClickDelete.connections = {}
+    ClickDelete.currentHoveredObject = nil
+    ClickDelete.keyPressed = false
+    
+    if not ClickDelete.Enabled then return end
+    
+    local currentKey = ClickDelete.DeleteKey
+    
+    -- DETECTAR CUANDO SE PRESIONA LA TECLA
+    local inputBeganConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == currentKey then
+            ClickDelete.keyPressed = true
+            local target = clickDeleteMouse.Target
+            if target and not isProtected(target) then
+                ClickDelete.currentHoveredObject = target
+                setRedTransparent(target)
+            end
+        end
+    end)
+    table.insert(ClickDelete.connections, inputBeganConn)
+    
+    -- DETECTAR CUANDO SE SUELTA LA TECLA
+    local inputEndedConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+        if input.KeyCode == currentKey then
+            ClickDelete.keyPressed = false
+            if ClickDelete.currentHoveredObject then
+                restoreObject(ClickDelete.currentHoveredObject)
+                ClickDelete.currentHoveredObject = nil
+            end
+        end
+    end)
+    table.insert(ClickDelete.connections, inputEndedConn)
+    
+    -- DETECTAR CLICK IZQUIERDO MIENTRAS LA TECLA ESTÁ PRESIONADA
+    local clickConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and ClickDelete.keyPressed then
+            local target = clickDeleteMouse.Target
+            if target and target:IsA("BasePart") and not target:IsDescendantOf(LocalPlayer.Character) then
+                deleteObject(target)
+                if ClickDelete.currentHoveredObject == target then
+                    ClickDelete.currentHoveredObject = nil
+                end
+            end
+        end
+    end)
+    table.insert(ClickDelete.connections, clickConn)
+    
+    -- ACTUALIZAR RESALTADO CUANDO EL MOUSE SE MUEVE
+    local moveConn = clickDeleteMouse.Move:Connect(function()
+        local target = clickDeleteMouse.Target
+        if ClickDelete.keyPressed then
+            if target ~= ClickDelete.currentHoveredObject then
+                if ClickDelete.currentHoveredObject then
+                    restoreObject(ClickDelete.currentHoveredObject)
+                end
+                if target and target:IsA("BasePart") and not target:IsDescendantOf(LocalPlayer.Character) then
+                    if not isProtected(target) then
+                        ClickDelete.currentHoveredObject = target
+                        setRedTransparent(target)
+                    else
+                        ClickDelete.currentHoveredObject = nil
+                    end
+                else
+                    ClickDelete.currentHoveredObject = nil
+                end
+            end
+        else
+            if ClickDelete.currentHoveredObject then
+                restoreObject(ClickDelete.currentHoveredObject)
+                ClickDelete.currentHoveredObject = nil
+            end
+        end
+    end)
+    table.insert(ClickDelete.connections, moveConn)
+    
+    -- LIMPIAR CUANDO EL PERSONAJE RESPAWNEA
+    local charAddedConn = LocalPlayer.CharacterAdded:Connect(function()
+        ClickDelete.keyPressed = false
+        if ClickDelete.currentHoveredObject then
+            restoreObject(ClickDelete.currentHoveredObject)
+            ClickDelete.currentHoveredObject = nil
+        end
+    end)
+    table.insert(ClickDelete.connections, charAddedConn)
+end
+
+local function stopClickDelete()
+    for _, conn in ipairs(ClickDelete.connections) do
+        conn:Disconnect()
+    end
+    ClickDelete.connections = {}
+    if ClickDelete.currentHoveredObject then
+        restoreObject(ClickDelete.currentHoveredObject)
+        ClickDelete.currentHoveredObject = nil
+    end
+    ClickDelete.keyPressed = false
+end
+
+-- Funciones para controlar Click Delete desde la GUI
+function setClickDelete(enabled)
+    ClickDelete.Enabled = enabled
+    if enabled then
+        startClickDelete()
+    else
+        stopClickDelete()
+    end
+end
+
+local function setDeleteKey(key)
+    if key and key ~= "" then
+        if type(key) == "string" then
+            local keyName = key:gsub("Enum.KeyCode.", "")
+            ClickDelete.DeleteKey = Enum.KeyCode[keyName] or Enum.KeyCode.LeftAlt
+        else
+            ClickDelete.DeleteKey = key
+        end
+        if ClickDelete.Enabled then
+            stopClickDelete()
+            startClickDelete()
+        end
+    end
+end
+
+end
+-- ============================================================
+
+local function StartSpectate(playerName)
+    if SpectateConnection then
+        SpectateConnection:Disconnect()
+        SpectateConnection = nil
+    end
+    
+    if not Spectating then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
+        end
+        return
+    end
+    
+    local targetPlayer = Players:FindFirstChild(playerName)
+    if not targetPlayer then
+        Spectating = false
+        return
+    end
+    
+    SpectateConnection = RunService.RenderStepped:Connect(function()
+        if not Spectating then return end
+        
+        local target = Players:FindFirstChild(playerName)
+        if not target then
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
+            end
+            return
+        end
+        
+        local character = target.Character
+        if character and character:FindFirstChild("Humanoid") then
+            Workspace.CurrentCamera.CameraSubject = character.Humanoid
+        elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
+        end
+    end)
+end
+
+-- ====================== INFINITE ZOOM ======================
+local infiniteZoomEnabled = false
+local normalMaxZoom = 12.3 -- valor por defecto de Roblox
+
+local function setInfiniteZoom(enabled)
+    infiniteZoomEnabled = enabled
+    if enabled then
+        LocalPlayer.CameraMaxZoomDistance = math.huge
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    else
+        LocalPlayer.CameraMaxZoomDistance = normalMaxZoom
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    end
+end
+
+-- ============================================================
+-- DOBLE BYPASS (Tu Hyphon + Valary Emulation)
+-- ============================================================
+
+local Hyphon_Bypassed = false
+local Start = tick()
+
+local function HyphonBypass()
+    local HandshakeFunctions = {}
+    for Index, Object in next, getgc(false) do
+        if (typeof(Object) == "function" and islclosure(Object)) then 
+            local DebugInfo = debug.info(Object, "s")
+            if DebugInfo:match("PlayerGui") and DebugInfo:match("%x+") then
+                local Constants = debug.getconstants(Object)
+                local UpValues = debug.getupvalues(Object)
+
+                if (#UpValues == 20 and #Constants > 140 and #Constants < 150) then
+                    table.insert(HandshakeFunctions, Object)
+                end
+            end
+        end
+    end
+    if (#HandshakeFunctions ~= 0 and #HandshakeFunctions >= 22) then
+        for Index, Function in next, HandshakeFunctions do
+            if Index == 2 then
+                local Old
+                Old = hookfunction(Function, function(...)
+                    return table.unpack({})
+                end)
+            end
+            if Index == 11 then
+                local Old
+                Old = hookfunction(Function, function(...)
+                    local Args = {...}
+                    local NewArgs = table.clone(Args)
+                    NewArgs[2] = false
+                    return table.unpack(NewArgs)
+                end)
+            end
+        end
+        Hyphon_Bypassed = true
+    else
+        warn("Code 404 | report in server")
+        return
+    end
+end
+
+-- Valary Hyphon Emulation (segundo bypass)
+task.spawn(function()
+    if game.PlaceId == 15124180230 then return end
+
+    local Success, Function = xpcall(function()
+        local Function = filtergc("function", {StartLine = 4262, IgnoreExecutor = true}, true)
+        if not Function or typeof(Function) ~= "function" then
+            return error() 
+        end
+        return Function
+    end, function()
+        local Function = nil
+        for Index, Value in getgc() do
+            if typeof(Value) == "function" and not iscclosure(Value) then
+                if debug.info(Value, 'l') == 4262 then
+                    Function = Value
+                    break
+                end
+            end
+        end
+        if not Function or typeof(Function) ~= "function" then
+            return error() 
+        end
+        return Function
+    end)
+
+    if Success and Function then
+        debug.setupvalue(Function, 4, 0/0)
+        task.spawn(function()
+            while game:GetService("RunService").Stepped:Wait() do
+                pcall(function()
+                    debug.setupvalue(Function, 4, 0/0)
+                end)
+            end
+        end)
+        warn("[CryBaby Bypass] Anti-Cheat function patched")
+    end
+end)
+
+if game.PlaceId ~= 10179538382 then
+    HyphonBypass()
+    if Hyphon_Bypassed then
+        warn("Anticheat Bypass Successfully Ran. | Time Taken: " .. string.sub(tostring(tick() - Start), 1, 6) .. " seconds")
+    else
+        warn("Code 500 | report in server")
+    end
+end
+
+-- ========== RUNTIME & CONFIG ==========
+local RuntimeState = getgenv()
+if RuntimeState.zzzMeth == nil then
+    RuntimeState.zzzMeth = "Tween"
+end
+
+-- Variable para controlar si Auto Select está activo
+getgenv().AutoSelectEnabled = true
+
+-- ========== AUTO-SELECT TELEPORT METHOD BASED ON INVENTORY ==========
+local function ShouldUseInstantMethod()
+    local character = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    
+    if not character then
+        return false
+    end
+    
+    local function getAllTools(container)
+        local tools = {}
+        if not container then return tools end
+        for _, child in ipairs(container:GetChildren()) do
+            if child:IsA("Tool") then
+                table.insert(tools, child.Name)
+            end
+        end
+        return tools
+    end
+    
+    local characterTools = getAllTools(character)
+    local backpackTools = getAllTools(backpack)
+    
+    local allTools = {}
+    for _, name in ipairs(characterTools) do
+        table.insert(allTools, name)
+    end
+    for _, name in ipairs(backpackTools) do
+        table.insert(allTools, name)
+    end
+    
+    if #allTools == 0 then
+        return true   -- vacío → Instant
+    end
+    
+    for _, toolName in ipairs(allTools) do
+        if toolName ~= "Fist" and toolName ~= "Phone" then
+            return false  -- tiene otro item → Tween
+        end
+    end
+    
+    return true  -- solo Fist/Phone → Instant
+end
+
+local function UpdateTeleportMethod()
+    if ShouldUseInstantMethod() then
+        RuntimeState.zzzMeth = "Instant"
+    else
+        RuntimeState.zzzMeth = "Tween"
+    end
+end
+
+-- ============================================================
+-- HIDE NAME SYSTEM (Versión Valary)
+-- ============================================================
+
+-- Configuración
+getgenv().HideName = getgenv().HideName or {
+    Enabled = false,
+    NameValue = "discord.gg/CryBaby"
+}
+local HideName = getgenv().HideName
+
+-- Función para ocultar el nombre (con guardado del nombre original)
+function applyHideName()
+    pcall(function()
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local head = character:FindFirstChild("Head")
+        if not head then return end
+        
+        -- Buscar el RankTag en la cabeza
+        local rankTag = head:FindFirstChild("RankTag")
+        if rankTag then
+            local mainFrame = rankTag:FindFirstChild("MainFrame")
+            if mainFrame then
+                local nameLabel = mainFrame:FindFirstChild("NameLabel")
+                if nameLabel and nameLabel:IsA("TextLabel") then
+                    -- Guardar el nombre original si no existe
+                    if not nameLabel:GetAttribute("OriginalName") then
+                        nameLabel:SetAttribute("OriginalName", nameLabel.Text)
+                    end
+                    
+                    -- Cambiar o restaurar según el estado
+                    if HideName.Enabled then
+                        nameLabel.Text = HideName.NameValue
+                    else
+                        local original = nameLabel:GetAttribute("OriginalName")
+                        if original and original ~= "" then
+                            nameLabel.Text = original
+                        else
+                            nameLabel.Text = LocalPlayer.Name
+                        end
+                    end
+                end
+            end
+        end
+        
+        -- También buscar en toda la GUI del jugador
+        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if playerGui then
+            for _, v in pairs(playerGui:GetDescendants()) do
+                if v:IsA("TextLabel") then
+                    -- Guardar original si no existe
+                    if not v:GetAttribute("OriginalName") and v.Text == LocalPlayer.Name then
+                        v:SetAttribute("OriginalName", v.Text)
+                    end
+                    
+                    -- Cambiar o restaurar
+                    if v.Text == LocalPlayer.Name or v.Text == HideName.NameValue then
+                        if HideName.Enabled and v.Text ~= HideName.NameValue then
+                            v.Text = HideName.NameValue
+                        elseif not HideName.Enabled and v:GetAttribute("OriginalName") then
+                            v.Text = v:GetAttribute("OriginalName")
+                        elseif not HideName.Enabled then
+                            v.Text = LocalPlayer.Name
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local Apartments_Lists = {"LT1", "BH1", "BH2", "BH3", "BH4"}
+
+-- ========== NOCLIP (Apex) ==========
+local RoadSidewalkFolder = Workspace:FindFirstChild("Map") and Workspace.Map:FindFirstChild("Roads/Sidewalks")
+local NoclipParts = {}
+
+local SetHiddenProperty = function(instance, property, value)
+    pcall(function() sethiddenproperty(instance, property, value) end)
+end
+
+local NoclipBlacklist = {
+    -- Por NOMBRE:
+    "Floor",
+	"housed.0054",
+    -- "NombreDelObjeto",
+
+    -- Por POSICIÓN EXACTA (Vector3):
+    Vector3.new(752.62, 15.22, 438.37),
+    Vector3.new(705.19, 5.91, 432.12),
+	Vector3.new(773.69, 15.22, 413.37),
+	Vector3.new(752.56, 0.22, 434.31),
+	Vector3.new(1174.98, 8.50, 7.03),
+	Vector3.new(1175.10, 16.77, 4.68),
+	Vector3.new(1130.84, 1.19, 146.30),
+	Vector3.new(1130.88, 0.24, 173.31),
+	Vector3.new(1196.40, 0.23, 235.39),
+	Vector3.new(195.81, 0.19, 186.88),
+	Vector3.new(200.37, 1.36, 310.62),
+	Vector3.new(200.26, 2.29, 335.53),
+	Vector3.new(145.37, 1.36, 310.62),
+	Vector3.new(145.35, 2.56, 335.15),
+	Vector3.new(90.38, 1.84, 335.74),
+	Vector3.new(53.12, 0.69, 328.69),
+	Vector3.new(314.94, 1.93, 458.35),
+	Vector3.new(296.60, 3.74, 481.23),
+	Vector3.new(293.04, 4.11, 481.23),
+	Vector3.new(336.94, 14.43, 457.38),
+}
+
+local ExclusionsSideWalk_Folder = function(Part)
+    local partName = Part.Name:lower()
+
+    for _, entry in ipairs(NoclipBlacklist) do
+        if typeof(entry) == "string" then
+            if Part.Name == entry or partName == entry:lower() then
+                return true
+            end
+        elseif typeof(entry) == "Vector3" then
+            if Part:IsA("BasePart") and (Part.Position - entry).Magnitude < 1.5 then
+                return true
+            end
+        end
+    end
+
+    -- Excluir la moto del jugador
+    local bike = Workspace:FindFirstChild(LocalPlayer.Name .. "'s Car")
+    if bike and Part:IsDescendantOf(bike) then
+        return true
+    end
+
+    return (RoadSidewalkFolder and Part:IsDescendantOf(RoadSidewalkFolder))
+        or (Part.Name == "default")
+        or (Part.Name == "Sidewalk")
+        or (Part.Name == "Floor")
+        or (Part.Name == "Collision")
+        or (Part.Name == "QuaterCylinder")
+        or Part:IsDescendantOf(LocalPlayer.Character)
+        or (Part.Parent and Part.Parent:IsA("Model") and Players:GetPlayerFromCharacter(Part.Parent) ~= nil)
+        or (Part:IsA("VehicleSeat") or Part:IsA("Vehicle"))
+        or (Part.Name == "AntiFall_Platform1")
+        or (Part.Name == "AntiFall_Platform2")
+        or (partName:find("undergroundbp"))
+        or (partName:find("baseplate"))
+        or (partName:find("platform"))
+end
+
+local Reset_Noclip = function()
+    local Character = LocalPlayer.Character
+    if not Character then
+        for part, props in pairs(NoclipParts) do
+            if part:IsA("BasePart") then
+                SetHiddenProperty(part, "CanCollide", props.CanCollide)
+            end
+        end
+        NoclipParts = {}
+        return
+    end
+    
+    -- Obtener SOLO las partes SUPERIORES del cuerpo
+    local activeParts = {}
+    for _, partName in ipairs({"Head", "UpperTorso", "LowerTorso", 
+                               "LeftUpperArm", "LeftLowerArm", 
+                               "RightUpperArm", "RightLowerArm",
+                               "HumanoidRootPart"}) do
+        local part = Character:FindFirstChild(partName)
+        if part and part:IsA("BasePart") then
+            table.insert(activeParts, part)
+        end
+    end
+    
+    local overlapParams = OverlapParams.new()
+    overlapParams.FilterDescendantsInstances = {Character}
+    overlapParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    -- Verificar qué objetos sigue tocando el personaje (solo con partes superiores)
+    local stillTouching = {}
+    for _, bodyPart in ipairs(activeParts) do
+        if bodyPart and bodyPart:IsA("BasePart") then
+            local nearby = Workspace:GetPartsInPart(bodyPart, overlapParams)
+            for _, part in ipairs(nearby) do
+                if part:IsA("BasePart") and not part:IsDescendantOf(Character) then
+                    if not ExclusionsSideWalk_Folder(part) then
+                        local dist = (part.Position - bodyPart.Position).Magnitude
+                        if dist < 2.5 then
+                            stillTouching[part] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Restaurar SOLO los objetos que ya no está tocando
+    for part, props in pairs(NoclipParts) do
+        if part and part:IsA("BasePart") then
+            if not stillTouching[part] then
+                SetHiddenProperty(part, "CanCollide", props.CanCollide)
+                NoclipParts[part] = nil
+            end
+        end
+    end
+end
+
+    for part, props in pairs(NoclipParts) do
+        if part:IsA("BasePart") then
+            SetHiddenProperty(part, "CanCollide", props.CanCollide)
+        end
+    end
+    NoclipParts = {}
+
+-- NUEVA FUNCIÓN: Noclip + AutoClimb integrado
+local Noclip = function()
+    local Character = LocalPlayer.Character
+    if not Character then return end
+    
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+    if not Root then return end
+    
+    local humanoid = Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return end
+    
+    -- ============================================
+    -- PARTE 1: DETECTAR PIERNAS PARA AUTOCLIMB
+    -- ============================================
+    local legParts = {}
+    for _, partName in ipairs({"LeftUpperLeg", "LeftLowerLeg", "RightUpperLeg", "RightLowerLeg",
+                               "LeftFoot", "RightFoot"}) do
+        local part = Character:FindFirstChild(partName)
+        if part and part:IsA("BasePart") then
+            table.insert(legParts, part)
+        end
+    end
+    
+    local overlapParams = OverlapParams.new()
+    overlapParams.FilterDescendantsInstances = {Character}
+    overlapParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    -- Verificar si las piernas están tocando un objeto para subir
+    local shouldClimb = false
+    local climbTarget = nil
+    local climbHeight = 0
+    
+    for _, legPart in ipairs(legParts) do
+        if not legPart then continue end
+        
+        local nearbyParts = Workspace:GetPartsInPart(legPart, overlapParams)
+        
+        for _, part in ipairs(nearbyParts) do
+            if not part:IsA("BasePart") then continue end
+            if part:IsDescendantOf(Character) then continue end
+            
+            -- Verificar si es un objeto válido
+            if ExclusionsSideWalk_Folder(part) then continue end
+            if Workspace:FindFirstChild("Do not touch") then continue end
+            
+            -- Verificar distancia real
+            local distance = (part.Position - legPart.Position).Magnitude
+            if distance > 2.5 then continue end
+            
+            -- Calcular altura del objeto
+            local objectHeight = part.Size.Y
+            if objectHeight > 2.5 then continue end -- Objeto muy alto, no subir
+            
+            local topY = part.Position.Y + (part.Size.Y / 2)
+            local currentY = Root.Position.Y
+            local heightDiff = topY - currentY
+            
+            -- Solo subir si el objeto está a una altura razonable
+            if heightDiff > 0.1 and heightDiff < 3.5 then
+                shouldClimb = true
+                climbTarget = part
+                climbHeight = topY + 0.2 -- Posición encima del objeto
+                break
+            end
+        end
+        if shouldClimb then break end
+    end
+    
+    -- ============================================
+    -- PARTE 2: SUBIR AUTOMÁTICAMENTE (si es necesario)
+    -- ============================================
+    if shouldClimb and climbTarget and climbTarget.Parent then
+        -- Subir gradualmente al objeto
+        local startY = Root.Position.Y
+        local endY = climbHeight
+        
+        -- Subida suave en pasos
+        local steps = math.max(math.ceil((endY - startY) / 0.3), 3)
+        
+        for i = 1, steps do
+            local t = i / steps
+            local lerpY = startY + (endY - startY) * t
+            Root.Position = Vector3.new(Root.Position.X, lerpY, Root.Position.Z)
+            task.wait(0.03)
+        end
+        
+        -- Posición final exacta
+        Root.Position = Vector3.new(Root.Position.X, endY, Root.Position.Z)
+        
+        -- Después de subir, continuar con el noclip normal
+    end
+    
+    -- ============================================
+    -- PARTE 3: NOCLIP NORMAL (solo partes superiores)
+    -- ============================================
+    
+    -- Obtener SOLO las partes SUPERIORES del cuerpo (excluyendo piernas y pies)
+    local bodyParts = {}
+    for _, partName in ipairs({"Head", "UpperTorso", "LowerTorso", 
+                               "LeftUpperArm", "LeftLowerArm", 
+                               "RightUpperArm", "RightLowerArm",
+                               "HumanoidRootPart"}) do
+        local part = Character:FindFirstChild(partName)
+        if part and part:IsA("BasePart") then
+            table.insert(bodyParts, part)
+        end
+    end
+    
+    -- Para CADA parte del cuerpo SUPERIOR, verificar qué objeto toca
+    for _, bodyPart in ipairs(bodyParts) do
+        if not bodyPart or not bodyPart:IsA("BasePart") then continue end
+        
+        -- Detectar objetos que ESTÁ TOCANDO esta parte del cuerpo
+        local nearbyParts = Workspace:GetPartsInPart(bodyPart, overlapParams)
+        
+        for _, part in ipairs(nearbyParts) do
+            if not part:IsA("BasePart") then continue end
+            if part == bodyPart then continue end
+            if part:IsDescendantOf(Character) then continue end
+            
+            -- Verificar si está en la blacklist
+            if ExclusionsSideWalk_Folder(part) then continue end
+            if Workspace:FindFirstChild("Do not touch") then continue end
+            
+            -- Verificar distancia real
+            local distance = (part.Position - bodyPart.Position).Magnitude
+            if distance > 2.5 then continue end
+            
+            -- Si el objeto es el mismo que estamos subiendo, NO desactivar colisiones
+            if part == climbTarget then continue end
+            
+            -- ¡DESACTIVAR COLISIONES SOLO DE ESTE OBJETO!
+            if not NoclipParts[part] then
+                NoclipParts[part] = { CanCollide = part.CanCollide }
+                SetHiddenProperty(part, "CanCollide", false)
+            end
+        end
+        
+        -- Raycast para detectar objetos en la dirección del movimiento
+        local params = RaycastParams.new()
+        params.FilterDescendantsInstances = {Character}
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        
+        local directions = {
+            bodyPart.CFrame.LookVector,
+            bodyPart.CFrame.LookVector * -1,
+            bodyPart.CFrame.RightVector,
+            bodyPart.CFrame.RightVector * -1,
+            Vector3.new(0, -1, 0),
+            Vector3.new(0, 1, 0),
+        }
+        
+        local maxDistance = 2.5
+        for _, dir in ipairs(directions) do
+            local origin = bodyPart.Position
+            local hit = Workspace:Raycast(origin, dir * maxDistance, params)
+            if hit then
+                local part = hit.Instance
+                if part and part:IsA("BasePart") then
+                    if not ExclusionsSideWalk_Folder(part) and not Workspace:FindFirstChild("Do not touch") then
+                        if part ~= climbTarget then -- No desactivar el objeto que estamos subiendo
+                            if not NoclipParts[part] then
+                                NoclipParts[part] = { CanCollide = part.CanCollide }
+                                SetHiddenProperty(part, "CanCollide", false)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local NoclipEnabled = false
+
+-- Variables para control de Noclip temporal durante teleport
+local NoclipDuringTeleport = false
+local TeleportingInProgress = false
+
+task.spawn(function()
+    while true do
+        if NoclipEnabled or NoclipDuringTeleport then
+            Noclip()
+        else
+            if next(NoclipParts) then
+                Reset_Noclip()
+            end
+        end
+        task.wait(0.03)
+    end
+end)
+
+-- ========== UNDERGROUND BASEPLATES ==========
+local UndergroundBaseplates = {}
+
+local function __swnBP()
+    local pos = {
+        Vector3.new(0, -8.2, 0),
+        Vector3.new(1321, -8.2, 660),
+        Vector3.new(-919, -8.2, 659),
+        Vector3.new(-898, -8.2, -652),
+        Vector3.new(1364, -8.2, -639)
+    }
+    local size = Vector3.new(1e9, 5, 1e9)
+    
+    for _, position in ipairs(pos) do
+        local partName = "UndergroundBP_" .. tostring(position)
+        local baseplate = Workspace:FindFirstChild(partName)
+        if not baseplate then
+            baseplate = Instance.new("Part")
+            baseplate.Name = partName
+            baseplate.Size = size
+            baseplate.Position = position
+            baseplate.Anchored = true
+            baseplate.CanCollide = true
+            baseplate.BrickColor = BrickColor.new("Dark stone grey")
+            baseplate.Material = Enum.Material.Concrete
+            baseplate.Parent = Workspace
+        end
+        UndergroundBaseplates[baseplate] = true
+    end
+end
+
+local function DeleteUndergroundBaseplates()
+    for baseplate in pairs(UndergroundBaseplates) do
+        if baseplate and baseplate.Parent then
+            baseplate:Destroy()
+        end
+    end
+    UndergroundBaseplates = {}
+end
+
+-- ========== MOVEMENT (Apex Tween + Underground) ==========
+local stepDistance = 1.5
+local waitTime = 0.08
+
+local function GetLiveCharacter(timeout)
+    local deadline = os.clock() + (timeout or 0)
+    repeat
+        local Character = LocalPlayer.Character
+        local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+        local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+        if Character and Character.Parent and Humanoid and Humanoid.Health > 0 and RootPart and RootPart.Parent then
+            return Character, Humanoid, RootPart
+        end
+        if not timeout or timeout <= 0 then break end
+        task.wait(0.05)
+    until os.clock() >= deadline
+    return nil, nil, nil
+end
+
+local function functionFirePrompt(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") then 
+        return false 
+    end
+    
+    prompt.Enabled = true
+    prompt.HoldDuration = 0
+    prompt.RequiresLineOfSight = false
+    prompt.MaxActivationDistance = 100
+
+    local success = pcall(function()
+        fireproximityprompt(prompt)
+    end)
+    
+    if not success then
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.wait(0.05)
+            prompt:InputHoldEnd()
+        end)
+    end
+    
+    return true
+end
+
+local function GetRootPart(timeout)
+    local _, _, RootPart = GetLiveCharacter(timeout or 2)
+    return RootPart
+end
+
+local function moveToPosition(character, targetPosition, customStep, customWait)
+    local _, _, humanoidRootPart = GetLiveCharacter(3)
+    if not humanoidRootPart then return false end
+
+    local moveStep = customStep or stepDistance
+    local moveWait = customWait or waitTime
+    local distance = (targetPosition - humanoidRootPart.Position).Magnitude
+
+    -- Ahora funciona SIEMPRE (no solo cuando hay farm activo)
+    while distance > moveStep do
+        _, _, humanoidRootPart = GetLiveCharacter(3)
+        if not humanoidRootPart then return false end
+
+        local currentPosition = humanoidRootPart.Position
+        distance = (targetPosition - currentPosition).Magnitude
+        if distance <= moveStep then break end
+
+        local direction = (targetPosition - currentPosition).Unit
+        humanoidRootPart.CFrame = CFrame.new(currentPosition + direction * moveStep)
+        task.wait(moveWait)
+    end
+
+    _, _, humanoidRootPart = GetLiveCharacter(3)
+    if humanoidRootPart then
+        humanoidRootPart.CFrame = CFrame.new(targetPosition)
+    else
+        return false
+    end
+    return true
+end
+
+local function handleMovement(dirP)
+    local isTweenMode = (RuntimeState.zzzMeth ~= "Instant")
+    
+    -- Solo activar noclip TEMPORAL (no tocar el toggle de la GUI)
+    if isTweenMode and not TeleportingInProgress then
+        TeleportingInProgress = true
+        NoclipDuringTeleport = true
+    end
+    
+    if RuntimeState.zzzMeth == "Instant" then
+        local RootPart = GetRootPart(6)
+        if not RootPart then 
+            TeleportingInProgress = false
+            NoclipDuringTeleport = false
+            return false 
+        end
+
+        RootPart.CFrame = CFrame.new(0, 9e9, 0)
+        task.wait(1.8)
+
+        RootPart = GetRootPart(6)
+        if not RootPart then 
+            TeleportingInProgress = false
+            NoclipDuringTeleport = false
+            return false 
+        end
+
+        RootPart.CFrame = CFrame.new(dirP)
+        task.wait(0.35)
+        
+        TeleportingInProgress = false
+        NoclipDuringTeleport = false
+        return true
+
+    else
+        -- ========== MODO TWEEN ==========
+        __swnBP()
+
+        local Character, _, RootPart = GetLiveCharacter(3)
+        if not Character or not RootPart then
+            DeleteUndergroundBaseplates()
+            TeleportingInProgress = false
+            NoclipDuringTeleport = false
+            return false
+        end
+
+        -- Agacharse (C)
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.C, false, game)
+        end)
+        task.wait(0.12)
+
+        local undergroundStart = Vector3.new(RootPart.Position.X, -2.4, RootPart.Position.Z)
+        RootPart.CFrame = CFrame.new(undergroundStart)
+        task.wait(0.45)
+
+        local undergroundTarget = Vector3.new(dirP.X, -2.8, dirP.Z)
+        local success = moveToPosition(Character, undergroundTarget)
+
+        if success then
+            _, _, RootPart = GetLiveCharacter(3)
+            if RootPart then
+                RootPart.CFrame = CFrame.new(dirP)
+                task.wait(0.4)
+            end
+        end
+
+        -- Levantarse (soltar C)
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.C, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftControl, false, game)
+        end)
+        task.wait(0.1)
+
+        -- Borrar segundo piso
+        DeleteUndergroundBaseplates()
+
+        -- Apagar noclip temporal (NO tocar NoclipEnabled del toggle)
+        TeleportingInProgress = false
+        NoclipDuringTeleport = false
+
+        return success
+    end
+end
+
+local function PreMaskTeleport(dirP, useHighTp)
+    if RuntimeState.zzzMeth == "Instant" or useHighTp then
+        local RootPart = GetRootPart(6)
+        if not RootPart then return false end
+
+        RootPart.CFrame = CFrame.new(0, 9e9, 0)
+        task.wait(1.8)
+        RootPart = GetRootPart(6)
+        if not RootPart then return false end
+
+        RootPart.CFrame = CFrame.new(dirP)
+        task.wait(0.4)
+        return true
+    end
+
+    -- Tween normal
+    return handleMovement(dirP)
+end
+
+-- Función pública que usan todos los teleports de la GUI
+local function ApexTeleport(targetCFrame)
+    -- Si Auto Select está activo, revisar inventario ANTES de teletransportar
+    if getgenv().AutoSelectEnabled then
+        UpdateTeleportMethod()
+    end
+
+    -- Limpiar estado residual por si acaso
+    if TeleportingInProgress then
+        TeleportingInProgress = false
+        NoclipDuringTeleport = false
+        if not NoclipEnabled then
+            NoclipEnabled = false
+        end
+    end
+    
+    local target
+    if typeof(targetCFrame) == "CFrame" then
+        target = targetCFrame
+    elseif typeof(targetCFrame) == "Vector3" then
+        target = CFrame.new(targetCFrame)
+    else
+        return false
+    end
+
+    return handleMovement(target.Position)
+end
+
+local Workspace, RunService, Players, CoreGui, Lighting = cloneref(game:GetService("Workspace")), cloneref(game:GetService("RunService")), cloneref(game:GetService("Players")), game:GetService("CoreGui"), cloneref(game:GetService("Lighting"))
+
+local ESP = {
+    Enabled = false,
+    TeamCheck = false,
+    MaxDistance = 1000,
+    FontSize = 12,
+    Font = Enum.Font.Code,
+    ShowEnemyTag = false,
+    FadeOut = {
+        OnDistance = false,
+        OnDeath = false,
+        OnLeave = false,
+    },
+    Options = { 
+        Teamcheck = false, TeamcheckRGB = Color3.fromRGB(0, 255, 0),
+        Friendcheck = false, FriendcheckRGB = Color3.fromRGB(0, 255, 0),
+        Highlight = false, HighlightRGB = Color3.fromRGB(255, 0, 0),
+    },
+    Drawing = {
+        Chams = {
+            Enabled = false,
+            Thermal = false,
+            FillRGB = Color3.fromRGB(119, 120, 255),
+            Fill_Transparency = 0.6,
+            OutlineRGB = Color3.fromRGB(119, 120, 255),
+            Outline_Transparency = 0,
+            VisibleCheck = false,
+        },
+        Names = {
+            Enabled = true,
+            RGB = Color3.fromRGB(255, 255, 255),
+        },
+        Flags = {
+            Enabled = false,
+        },
+        Distances = {
+            Enabled = true, 
+            Position = "Text",
+            RGB = Color3.fromRGB(255, 255, 255),
+        },
+        Weapons = {
+            Enabled = true,
+            WeaponTextRGB = Color3.fromRGB(119, 120, 255),
+            Outlined = false,
+            Gradient = false,
+            GradientRGB1 = Color3.fromRGB(255, 255, 255),
+            GradientRGB2 = Color3.fromRGB(119, 120, 255),
+        },
+        Healthbar = {
+            Enabled = true,  
+            HealthText = true,
+            Lerp = false,
+            HealthTextRGB = Color3.fromRGB(255, 255, 255),
+            Width = 2.5,
+            Gradient = true,
+            GradientRGB1 = Color3.fromRGB(200, 0, 0),
+            GradientRGB2 = Color3.fromRGB(255, 255, 0),
+            GradientRGB3 = Color3.fromRGB(255, 0, 0), 
+        },
+Boxes = {
+    Animate = false,
+    RotationSpeed = 300,
+    Gradient = false,
+    GradientRGB1 = Color3.fromRGB(255, 255, 255),
+    GradientRGB2 = Color3.fromRGB(0, 0, 0), 
+    GradientFill = true,
+    GradientFillRGB1 = Color3.fromRGB(255, 255, 255),
+    GradientFillRGB2 = Color3.fromRGB(0, 0, 0), 
+    Filled = {
+        Enabled = false,
+        Transparency = 0.75,
+        RGB = Color3.fromRGB(0, 0, 0),
+    },
+    Full = {
+        Enabled = true,
+        RGB = Color3.fromRGB(255, 255, 255),  -- Color del borde normal
+        BorderColor = Color3.fromRGB(0, 0, 0), -- Color del borde negro grueso
+        Thickness = 2,                        -- Grosor del borde negro
+    },
+    Corner = {
+        Enabled = false,
+        RGB = Color3.fromRGB(0, 0, 0),
+        Thickness = 2,
+    },
+},
+    },
+    Connections = {
+        RunService = RunService,
+    },
+}
+
+local FONT_DIR = "Trapgzz_Fonts"
+pcall(function()
+    if not isfolder(FONT_DIR) then makefolder(FONT_DIR) end
+    if not isfolder(FONT_DIR .. "/assets") then makefolder(FONT_DIR .. "/assets") end
+    if not isfolder(FONT_DIR .. "/fonts") then makefolder(FONT_DIR .. "/fonts") end
+end)
+
+local CustomFonts = {}
+
+local function RegisterFont(Name, Weight, Style, Asset)
+    local ok, result = pcall(function()
+        local assetPath = FONT_DIR .. "/assets/" .. Asset.Id
+        if isfile(assetPath) then
+            pcall(delfile, assetPath)
+        end
+        writefile(assetPath, Asset.Font)
+
+        local Data = {
+            name = Name,
+            faces = {{
+                Name = "Normal",
+                weight = Weight,
+                style = Style,
+                assetId = getcustomasset(assetPath),
+            }},
+        }
+
+        local fontPath = FONT_DIR .. "/fonts/" .. Name .. ".font"
+        writefile(fontPath, HttpService:JSONEncode(Data))
+        return getcustomasset(fontPath)
+    end)
+
+    if ok and result then
+        return result
+    end
+    warn("[Fonts] Failed: " .. tostring(Name))
+    return nil
+end
+
+-- Las 4 custom de bronx.lol (mismos links exactos)
+do
+    local Tahoma = RegisterFont("Tahoma", 400, "Normal", {
+        Id = "Tahoma.ttf",
+        Font = game:HttpGet("https://github.com/KingVonOBlockJoyce/OctoHook-UI/raw/refs/heads/main/fs-tahoma-8px%20(3).ttf"),
+    })
+    local Pixel = RegisterFont("Pixel", 400, "Normal", {
+        Id = "Pixel.ttf",
+        Font = game:HttpGet("https://github.com/KingVonOBlockJoyce/vaderpaste.luau/raw/refs/heads/main/Pixel.ttf"),
+    })
+    local Minecraftia = RegisterFont("Minecraftia", 400, "Normal", {
+        Id = "Minecraftia.ttf",
+        Font = game:HttpGet("https://github.com/i77lhm/storage/raw/refs/heads/main/fonts/Minecraftia-Regular.ttf"),
+    })
+    local Verdana = RegisterFont("Verdana", 400, "Normal", {
+        Id = "Verdana.ttf",
+        Font = game:HttpGet("https://github.com/i77lhm/storage/raw/refs/heads/main/fonts/Verdana-Font.ttf"),
+    })
+
+    if Tahoma then
+        CustomFonts["Plex"] = Font.new(Tahoma, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    end
+    if Pixel then
+        CustomFonts["Pixel"] = Font.new(Pixel, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    end
+    if Minecraftia then
+        CustomFonts["Minecraftia"] = Font.new(Minecraftia, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    end
+    if Verdana then
+        CustomFonts["Verdana"] = Font.new(Verdana, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    end
+end
+
+-- Misma lógica que bronx.lol
+local function ResolveFont(state)
+    if state == "Pixel" or state == "Plex" or state == "Minecraftia" or state == "Verdana" then
+        return CustomFonts[state] or Enum.Font.Code
+    end
+    return Enum.Font[state] or Enum.Font.Code
+end
+
+local function ApplyFont(label, font)
+    if not label or not font then return end
+    if typeof(font) == "EnumItem" then
+        label.Font = font          -- nativa
+    else
+        label.FontFace = font      -- custom
+    end
+end
+
+-- Default = Plex (igual que bronx)
+ESP.Font = CustomFonts["Plex"] or Enum.Font.Code
+
+-- Def & Vars
+local Euphoria = ESP.Connections
+local lplayer = Players.LocalPlayer
+local Cam = Workspace.CurrentCamera
+local RotationAngle, Tick = -45, tick()
+
+-- Functions
+local Functions = {}
+do
+    function Functions:Create(Class, Properties)
+        local _Instance = typeof(Class) == 'string' and Instance.new(Class) or Class
+        for Property, Value in pairs(Properties) do
+            _Instance[Property] = Value
+        end
+        return _Instance
+    end
+
+function Functions:FadeOutOnDist(element, distance)
+    local transparency = math.max(0.1, 1 - (distance / ESP.MaxDistance))
+    if element:IsA("TextLabel") then
+        element.TextTransparency = 1 - transparency
+        element.TextStrokeTransparency = 1 - transparency
+    elseif element:IsA("ImageLabel") then
+        element.ImageTransparency = 1 - transparency
+    elseif element:IsA("UIStroke") then
+        element.Transparency = 1 - transparency
+    elseif element:IsA("Frame") then
+        element.BackgroundTransparency = math.clamp(1 - transparency + 0.3, 0, 1)
+    elseif element:IsA("Highlight") then
+    end
+end
+
+-- ===== FUNCIÓN ADD OUTLINE (NUEVA) =====
+Functions.AddOutline = function(Frame, Thickness)
+    -- Borde superior
+    Functions:Create("Frame", {
+        Parent = Frame,
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        Position = UDim2.new(0, -Thickness, 0, -Thickness),
+        Size = UDim2.new(1, Thickness * 2, 0, Thickness),
+        ZIndex = Frame.ZIndex - 1
+    })
+    
+    -- Borde inferior
+    Functions:Create("Frame", {
+        Parent = Frame,
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        Position = UDim2.new(0, -Thickness, 1, 0),
+        Size = UDim2.new(1, Thickness * 2, 0, Thickness),
+        ZIndex = Frame.ZIndex - 1
+    })
+    
+    -- Borde izquierdo
+    Functions:Create("Frame", {
+        Parent = Frame,
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        Position = UDim2.new(0, -Thickness, 0, 0),
+        Size = UDim2.new(0, Thickness, 1, 0),
+        ZIndex = Frame.ZIndex - 1
+    })
+    
+    -- Borde derecho
+    Functions:Create("Frame", {
+        Parent = Frame,
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        Position = UDim2.new(1, 0, 0, 0),
+        Size = UDim2.new(0, Thickness, 1, 0),
+        ZIndex = Frame.ZIndex - 1
+    })
+end
+
+do -- Initialize
+    local ScreenGui = Functions:Create("ScreenGui", {
+        Parent = CoreGui,
+        Name = "ESPHolder",
+        ResetOnSpawn = false,
+    })
+
+    local DupeCheck = function(plr)
+        if ScreenGui:FindFirstChild(plr.Name) then
+            ScreenGui[plr.Name]:Destroy()
+        end
+    end
+
+    local CreateESP = function(plr)
+        coroutine.wrap(DupeCheck)(plr)
+
+        local Holder = Functions:Create("Folder", {
+            Parent = ScreenGui,
+            Name = plr.Name
+        })
+
+        local Name = Functions:Create("TextLabel", {
+            Parent = Holder,
+            Position = UDim2.new(0.5, 0, 0, -11),
+            Size = UDim2.new(0, 100, 0, 20),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            Font = Enum.Font.Code,
+            TextSize = ESP.FontSize,
+            TextStrokeTransparency = 0,
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+            RichText = true
+        })
+
+        local Distance = Functions:Create("TextLabel", {
+            Parent = Holder,
+            Position = UDim2.new(0.5, 0, 0, 11),
+            Size = UDim2.new(0, 100, 0, 20),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            Font = Enum.Font.Code,
+            TextSize = ESP.FontSize,
+            TextStrokeTransparency = 0,
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+            RichText = true
+        })
+
+        local Weapon = Functions:Create("TextLabel", {
+            Parent = Holder,
+            Position = UDim2.new(0.5, 0, 0, 31),
+            Size = UDim2.new(0, 100, 0, 20),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            Font = Enum.Font.Code,
+            TextSize = ESP.FontSize,
+            TextStrokeTransparency = 0,
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+            RichText = true
+        })
+
+local Box = Functions:Create("Frame", {
+    Parent = Holder,
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+    BackgroundTransparency = 0,
+    BorderSizePixel = 0,
+    ZIndex = 2
+})
+
+local Gradient1 = Functions:Create("UIGradient", {
+    Parent = Box,
+    Enabled = true,
+    Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, ESP.Drawing.Boxes.GradientFillRGB1),
+        ColorSequenceKeypoint.new(1, ESP.Drawing.Boxes.GradientFillRGB2)
+    }
+})
+
+-- ===== BORDE NORMAL (configurable por color) =====
+local Outline = Functions:Create("UIStroke", {
+    Parent = Box,
+    Enabled = true,
+    Transparency = 0,
+    Color = ESP.Drawing.Boxes.Full.RGB,  -- Ahora usa el color de la GUI
+    Thickness = 1,
+    LineJoinMode = Enum.LineJoinMode.Miter,
+    ZIndex = 3
+})
+
+-- ===== BORDE NEGRO GRUESO (siempre negro, 2px) =====
+local BorderOutline = Functions:Create("UIStroke", {
+    Parent = Box,
+    Enabled = true,
+    Transparency = 0,
+    Color = Color3.fromRGB(0, 0, 0),
+    Thickness = 2,
+    LineJoinMode = Enum.LineJoinMode.Miter,
+    ZIndex = 1
+})
+
+-- ===== CONTORNO NEGRO ADICIONAL (AddOutline - 4 marcos) =====
+-- Borde superior
+Functions:Create("Frame", {
+    Parent = Box,
+    BorderSizePixel = 0,
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    Position = UDim2.new(0, -1, 0, -1),
+    Size = UDim2.new(1, 2, 0, 1),
+    ZIndex = 0
+})
+-- Borde inferior
+Functions:Create("Frame", {
+    Parent = Box,
+    BorderSizePixel = 0,
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    Position = UDim2.new(0, -1, 1, 0),
+    Size = UDim2.new(1, 2, 0, 1),
+    ZIndex = 0
+})
+-- Borde izquierdo
+Functions:Create("Frame", {
+    Parent = Box,
+    BorderSizePixel = 0,
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    Position = UDim2.new(0, -1, 0, 0),
+    Size = UDim2.new(0, 1, 1, 0),
+    ZIndex = 0
+})
+-- Borde derecho
+Functions:Create("Frame", {
+    Parent = Box,
+    BorderSizePixel = 0,
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    Position = UDim2.new(1, 0, 0, 0),
+    Size = UDim2.new(0, 1, 1, 0),
+    ZIndex = 0
+})
+
+local Gradient2 = Functions:Create("UIGradient", {
+    Parent = Outline,
+    Enabled = false,
+    Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, ESP.Drawing.Boxes.GradientRGB1),
+        ColorSequenceKeypoint.new(1, ESP.Drawing.Boxes.GradientRGB2)
+    }
+})
+
+        local Healthbar = Functions:Create("Frame", {
+            Parent = Holder,
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundTransparency = 0
+        })
+
+        local BehindHealthbar = Functions:Create("Frame", {
+            Parent = Holder,
+            ZIndex = -1,
+            BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+            BackgroundTransparency = 0
+        })
+
+        local HealthbarGradient = Functions:Create("UIGradient", {
+            Parent = Healthbar,
+            Enabled = true,
+            Rotation = -90,
+            Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, ESP.Drawing.Healthbar.GradientRGB1),
+                ColorSequenceKeypoint.new(0.5, ESP.Drawing.Healthbar.GradientRGB2),
+                ColorSequenceKeypoint.new(1, ESP.Drawing.Healthbar.GradientRGB3)
+            }
+        })
+
+        local HealthText = Functions:Create("TextLabel", {
+            Parent = Holder,
+            Position = UDim2.new(0.1, 0, 0, 31),
+            Size = UDim2.new(0, 100, 0, 20),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            Font = Enum.Font.Code,
+            TextSize = ESP.FontSize,
+            TextStrokeTransparency = 0,
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        })
+
+        local Chams = Functions:Create("Highlight", {
+            Parent = Holder,
+            FillTransparency = 0.6,
+            OutlineTransparency = 0,
+            FillColor = Color3.fromRGB(119, 120, 255),
+            OutlineColor = Color3.fromRGB(119, 120, 255),
+            DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
+            Enabled = false
+        })
+
+        local LeftTop = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+        local LeftSide = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+        local RightTop = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+        local RightSide = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+        local BottomSide = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+        local BottomDown = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+        local BottomRightSide = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+        local BottomRightDown = Functions:Create("Frame", {Parent = Holder, BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0})
+
+        local Flag1 = Functions:Create("TextLabel", {
+            Parent = Holder,
+            Size = UDim2.new(0, 100, 0, 16),
+            AnchorPoint = Vector2.new(0, 0.5),
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            Font = Enum.Font.Code,
+            TextSize = ESP.FontSize,
+            TextStrokeTransparency = 0,
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Visible = false
+        })
+
+        local function HideESP()
+            Box.Visible = false
+            Name.Visible = false
+            Distance.Visible = false
+            Weapon.Visible = false
+            Healthbar.Visible = false
+            BehindHealthbar.Visible = false
+            HealthText.Visible = false
+            LeftTop.Visible = false
+            LeftSide.Visible = false
+            BottomSide.Visible = false
+            BottomDown.Visible = false
+            RightTop.Visible = false
+            RightSide.Visible = false
+            BottomRightSide.Visible = false
+            BottomRightDown.Visible = false
+            Flag1.Visible = false
+            Chams.Enabled = false
+        end
+
+        local Connection
+        Connection = Euphoria.RunService.RenderStepped:Connect(function()
+            if not ESP.Enabled or not plr or not plr.Parent then
+                HideESP()
+                return
+            end
+
+            local character = plr.Character
+            if not character or not character:FindFirstChild("HumanoidRootPart") then
+                HideESP()
+                return
+            end
+
+            local HRP = character.HumanoidRootPart
+            local Humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not Humanoid or Humanoid.Health <= 0 then
+                HideESP()
+                return
+            end
+
+            local Pos, OnScreen = Cam:WorldToScreenPoint(HRP.Position)
+            local Dist = (Cam.CFrame.Position - HRP.Position).Magnitude
+
+            if not OnScreen or Dist > ESP.MaxDistance then
+                HideESP()
+                return
+            end
+
+            if ESP.TeamCheck then
+                if lplayer.Team and plr.Team and lplayer.Team == plr.Team then
+                    HideESP()
+                    return
+                end
+            end
+
+            local Size = HRP.Size.Y
+            local scaleFactor = (Size * Cam.ViewportSize.Y) / (Pos.Z * 2)
+            local w, h = 2 * scaleFactor, 4.5 * scaleFactor
+
+local currentFont = ESP.Font
+local currentSize = ESP.FontSize
+ApplyFont(Name, currentFont)
+Name.TextSize = currentSize
+ApplyFont(Distance, currentFont)
+Distance.TextSize = currentSize
+ApplyFont(Weapon, currentFont)
+Weapon.TextSize = currentSize
+ApplyFont(HealthText, currentFont)
+HealthText.TextSize = currentSize
+ApplyFont(Flag1, currentFont)
+Flag1.TextSize = currentSize
+
+            if ESP.FadeOut.OnDistance then
+                Functions:FadeOutOnDist(Box, Dist)
+                Functions:FadeOutOnDist(Outline, Dist)
+                Functions:FadeOutOnDist(Name, Dist)
+                Functions:FadeOutOnDist(Distance, Dist)
+                Functions:FadeOutOnDist(Weapon, Dist)
+                Functions:FadeOutOnDist(Healthbar, Dist)
+                Functions:FadeOutOnDist(BehindHealthbar, Dist)
+                Functions:FadeOutOnDist(HealthText, Dist)
+                Functions:FadeOutOnDist(LeftTop, Dist)
+                Functions:FadeOutOnDist(LeftSide, Dist)
+                Functions:FadeOutOnDist(BottomSide, Dist)
+                Functions:FadeOutOnDist(BottomDown, Dist)
+                Functions:FadeOutOnDist(RightTop, Dist)
+                Functions:FadeOutOnDist(RightSide, Dist)
+                Functions:FadeOutOnDist(BottomRightSide, Dist)
+                Functions:FadeOutOnDist(BottomRightDown, Dist)
+                Functions:FadeOutOnDist(Flag1, Dist)
+            end
+
+            Chams.Adornee = character
+            Chams.Enabled = ESP.Drawing.Chams.Enabled
+            Chams.FillColor = ESP.Drawing.Chams.FillRGB
+            Chams.OutlineColor = ESP.Drawing.Chams.OutlineRGB
+            Chams.FillTransparency = ESP.Drawing.Chams.Fill_Transparency
+            Chams.OutlineTransparency = ESP.Drawing.Chams.Outline_Transparency
+
+            if ESP.Drawing.Chams.Thermal then
+                local breathe = (math.sin(tick() * 3) + 1) / 2
+                Chams.FillTransparency = ESP.Drawing.Chams.Fill_Transparency + (0.3 * breathe)
+            end
+
+            Chams.DepthMode = ESP.Drawing.Chams.VisibleCheck and Enum.HighlightDepthMode.Occluded or Enum.HighlightDepthMode.AlwaysOnTop
+
+            local cornerColor = ESP.Drawing.Boxes.Corner.RGB
+            LeftTop.BackgroundColor3 = cornerColor
+            LeftSide.BackgroundColor3 = cornerColor
+            RightTop.BackgroundColor3 = cornerColor
+            RightSide.BackgroundColor3 = cornerColor
+            BottomSide.BackgroundColor3 = cornerColor
+            BottomDown.BackgroundColor3 = cornerColor
+            BottomRightSide.BackgroundColor3 = cornerColor
+            BottomRightDown.BackgroundColor3 = cornerColor
+
+            LeftTop.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            LeftTop.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y - h / 2)
+            LeftTop.Size = UDim2.new(0, w / 5, 0, 2)
+
+            LeftSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            LeftSide.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y - h / 2)
+            LeftSide.Size = UDim2.new(0, 1, 0, h / 5)
+
+            BottomSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            BottomSide.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y + h / 2)
+            BottomSide.Size = UDim2.new(0, 1, 0, h / 5)
+            BottomSide.AnchorPoint = Vector2.new(0, 1)
+
+            BottomDown.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            BottomDown.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y + h / 2)
+            BottomDown.Size = UDim2.new(0, w / 5, 0, 1)
+            BottomDown.AnchorPoint = Vector2.new(0, 1)
+
+            RightTop.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            RightTop.Position = UDim2.new(0, Pos.X + w / 2, 0, Pos.Y - h / 2)
+            RightTop.Size = UDim2.new(0, w / 5, 0, 1)
+            RightTop.AnchorPoint = Vector2.new(1, 0)
+
+            RightSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            RightSide.Position = UDim2.new(0, Pos.X + w / 2 - 1, 0, Pos.Y - h / 2)
+            RightSide.Size = UDim2.new(0, 1, 0, h / 5)
+
+            BottomRightSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            BottomRightSide.Position = UDim2.new(0, Pos.X + w / 2, 0, Pos.Y + h / 2)
+            BottomRightSide.Size = UDim2.new(0, 1, 0, h / 5)
+            BottomRightSide.AnchorPoint = Vector2.new(1, 1)
+
+            BottomRightDown.Visible = ESP.Drawing.Boxes.Corner.Enabled
+            BottomRightDown.Position = UDim2.new(0, Pos.X + w / 2, 0, Pos.Y + h / 2)
+            BottomRightDown.Size = UDim2.new(0, w / 5, 0, 1)
+            BottomRightDown.AnchorPoint = Vector2.new(1, 1)
+
+            Box.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y - h / 2)
+            Box.Size = UDim2.new(0, w, 0, h)
+            Box.Visible = ESP.Drawing.Boxes.Full.Enabled
+
+            Outline.Color = ESP.Drawing.Boxes.Full.RGB
+            Outline.Enabled = ESP.Drawing.Boxes.Full.Enabled
+
+            if ESP.Drawing.Boxes.Filled.Enabled then
+                Box.BackgroundColor3 = ESP.Drawing.Boxes.Filled.RGB
+                Box.BackgroundTransparency = ESP.Drawing.Boxes.Filled.Transparency
+                Gradient1.Enabled = ESP.Drawing.Boxes.GradientFill
+                Gradient1.Color = ColorSequence.new{
+                    ColorSequenceKeypoint.new(0, ESP.Drawing.Boxes.GradientFillRGB1),
+                    ColorSequenceKeypoint.new(1, ESP.Drawing.Boxes.GradientFillRGB2)
+                }
+            else
+                Box.BackgroundTransparency = 1
+                Gradient1.Enabled = false
+            end
+
+            if ESP.Drawing.Boxes.Animate then
+                RotationAngle = RotationAngle + (tick() - Tick) * ESP.Drawing.Boxes.RotationSpeed * 0.05
+                Gradient1.Rotation = RotationAngle
+                Gradient2.Rotation = RotationAngle
+            else
+                Gradient1.Rotation = -45
+                Gradient2.Rotation = -45
+            end
+            Tick = tick()
+
+            local health = Humanoid.Health / Humanoid.MaxHealth
+            Healthbar.Visible = ESP.Drawing.Healthbar.Enabled
+            Healthbar.Position = UDim2.new(0, Pos.X - w / 2 - 6, 0, Pos.Y - h / 2 + h * (1 - health))
+            Healthbar.Size = UDim2.new(0, ESP.Drawing.Healthbar.Width, 0, h * health)
+
+            BehindHealthbar.Visible = ESP.Drawing.Healthbar.Enabled
+            BehindHealthbar.Position = UDim2.new(0, Pos.X - w / 2 - 6, 0, Pos.Y - h / 2)
+            BehindHealthbar.Size = UDim2.new(0, ESP.Drawing.Healthbar.Width, 0, h)
+
+-- NUEVO CÓDIGO:
+if ESP.Drawing.Healthbar.Gradient then
+    HealthbarGradient.Enabled = true
+    HealthbarGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, ESP.Drawing.Healthbar.GradientRGB1),
+        ColorSequenceKeypoint.new(0.5, ESP.Drawing.Healthbar.GradientRGB2),
+        ColorSequenceKeypoint.new(1, ESP.Drawing.Healthbar.GradientRGB3)
+    }
+    -- El color base no importa cuando hay gradiente
+    Healthbar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+else
+    HealthbarGradient.Enabled = false
+    -- AQUÍ se usa el color que elegiste en la GUI
+    Healthbar.BackgroundColor3 = ESP.Drawing.Healthbar.GradientRGB1
+end
+
+            if ESP.Drawing.Healthbar.HealthText then
+                local healthPercentage = math.floor(health * 100)
+                HealthText.Position = UDim2.new(0, Pos.X - w / 2 - 15, 0, Pos.Y - h / 2 + h * (1 - health) + 3)
+                HealthText.Text = tostring(healthPercentage)
+                HealthText.Visible = true
+
+                if ESP.Drawing.Healthbar.Lerp then
+                    HealthText.TextColor3 = health >= 0.75 and Color3.fromRGB(0, 255, 0)
+                        or health >= 0.5 and Color3.fromRGB(255, 255, 0)
+                        or health >= 0.25 and Color3.fromRGB(255, 170, 0)
+                        or Color3.fromRGB(255, 0, 0)
+                else
+                    HealthText.TextColor3 = ESP.Drawing.Healthbar.HealthTextRGB
+                end
+            else
+                HealthText.Visible = false
+            end
+
+            Name.Visible = ESP.Drawing.Names.Enabled
+            Name.TextColor3 = ESP.Drawing.Names.RGB
+
+            local prefix = ""
+            if ESP.Options.Friendcheck and lplayer:IsFriendsWith(plr.UserId) then
+                prefix = string.format('(<font color="rgb(%d,%d,%d)">F</font>) ',
+                    ESP.Options.FriendcheckRGB.R * 255,
+                    ESP.Options.FriendcheckRGB.G * 255,
+                    ESP.Options.FriendcheckRGB.B * 255)
+            else
+                if ESP.ShowEnemyTag then
+					prefix = '(<font color="rgb(255,0,0)">E</font>) '
+                else
+				    prefix = ""
+				end
+			end
+
+            if ESP.Drawing.Distances.Enabled and ESP.Drawing.Distances.Position == "Text" then
+                Name.Text = prefix .. plr.Name .. " [" .. math.floor(Dist) .. "]"
+            else
+                Name.Text = prefix .. plr.Name
+            end
+            Name.Position = UDim2.new(0, Pos.X, 0, Pos.Y - h / 2 - 11)
+
+            if ESP.Drawing.Distances.Enabled and ESP.Drawing.Distances.Position == "Bottom" then
+                Distance.Visible = true
+                Distance.Text = math.floor(Dist) .. "m"
+                Distance.TextColor3 = ESP.Drawing.Distances.RGB
+                Distance.Position = UDim2.new(0, Pos.X, 0, Pos.Y + h / 2 + 8)
+            else
+                Distance.Visible = false
+            end
+
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+                Weapon.Text = tool.Name
+            else
+                Weapon.Text = "none"
+            end
+            Weapon.Visible = ESP.Drawing.Weapons.Enabled
+            Weapon.TextColor3 = ESP.Drawing.Weapons.WeaponTextRGB
+            Weapon.Position = UDim2.new(0, Pos.X, 0, Pos.Y + h / 2 + (ESP.Drawing.Distances.Enabled and ESP.Drawing.Distances.Position == "Bottom" and 22 or 8))
+
+            if ESP.Drawing.Flags.Enabled then
+                Flag1.Visible = true
+                Flag1.Text = plr.Team and plr.Team.Name or "No Team"
+                Flag1.Position = UDim2.new(0, Pos.X + w / 2 + 4, 0, Pos.Y - h / 2 + 8)
+                Flag1.TextColor3 = plr.Team and plr.Team.TeamColor.Color or Color3.fromRGB(255, 255, 255)
+            else
+                Flag1.Visible = false
+            end
+        end)
+    end
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= lplayer then
+            task.spawn(CreateESP, v)
+        end
+    end
+
+    Players.PlayerAdded:Connect(function(v)
+        task.spawn(CreateESP, v)
+    end)
+
+    Players.PlayerRemoving:Connect(function(v)
+        if ScreenGui:FindFirstChild(v.Name) then
+            ScreenGui[v.Name]:Destroy()
+        end
+    end)
+end
