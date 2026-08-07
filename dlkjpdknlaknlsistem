@@ -1,3 +1,36 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dozzy15/bababababa/refs/heads/main/xezzioz"))()
+
+local Window = Library:Window({name = "TrapGoose"})
+
+local Tabs = {
+    Main     = Window:Tab({Name = "Main"}),
+    Combat   = Window:Tab({Name = "Combat"}),
+    Visuals  = Window:Tab({Name = "Visuals"}),
+    Players  = Window:Tab({Name = "Players"}),
+}
+
+getgenv().Toggles = getgenv().Toggles or {
+    ESP = false,
+    Boxes = true,
+    FilledBoxes = false,
+    Names = true,
+    HealthBars = true,
+    HealthText = true,
+    Weapons = true,
+    Distance = true,
+    Chams = false,
+    Flags = false,
+    AnimatedBoxes = false,
+    DynamicHealthText = true,
+    GradientHealthBar = true,
+    ThermalChams = false,
+    VisibleCheck = false,
+    TeamCheck = false,
+    FriendCheck = false,
+    ShowEnemyTag = false,
+    FadeOutOnDistance = false,
+}
+
 -- RESET DE CONFIGURACIONES GLOBALES
 getgenv().worldState = {
     Fullbright = false,
@@ -709,7 +742,7 @@ task.spawn(function()
                 end)
             end
         end)
-        warn("[CryBaby Bypass] Anti-Cheat function patched")
+        warn("[TrapGoose Bypass] Anti-Cheat function patched")
     end
 end)
 
@@ -790,7 +823,7 @@ end
 -- Configuración
 getgenv().HideName = getgenv().HideName or {
     Enabled = false,
-    NameValue = "discord.gg/CryBaby"
+    NameValue = "TrapGoose"
 }
 local HideName = getgenv().HideName
 
@@ -1442,7 +1475,7 @@ end
 
 local Workspace, RunService, Players, CoreGui, Lighting = cloneref(game:GetService("Workspace")), cloneref(game:GetService("RunService")), cloneref(game:GetService("Players")), game:GetService("CoreGui"), cloneref(game:GetService("Lighting"))
 
-local ESP = {
+getgenv().ESP = getgenv().ESP or {
     Enabled = false,
     TeamCheck = false,
     MaxDistance = 1000,
@@ -1500,37 +1533,39 @@ local ESP = {
             GradientRGB2 = Color3.fromRGB(255, 255, 0),
             GradientRGB3 = Color3.fromRGB(255, 0, 0), 
         },
-Boxes = {
-    Animate = false,
-    RotationSpeed = 300,
-    Gradient = false,
-    GradientRGB1 = Color3.fromRGB(255, 255, 255),
-    GradientRGB2 = Color3.fromRGB(0, 0, 0), 
-    GradientFill = true,
-    GradientFillRGB1 = Color3.fromRGB(255, 255, 255),
-    GradientFillRGB2 = Color3.fromRGB(0, 0, 0), 
-    Filled = {
-        Enabled = false,
-        Transparency = 0.75,
-        RGB = Color3.fromRGB(0, 0, 0),
-    },
-    Full = {
-        Enabled = true,
-        RGB = Color3.fromRGB(255, 255, 255),  -- Color del borde normal
-        BorderColor = Color3.fromRGB(0, 0, 0), -- Color del borde negro grueso
-        Thickness = 2,                        -- Grosor del borde negro
-    },
-    Corner = {
-        Enabled = false,
-        RGB = Color3.fromRGB(0, 0, 0),
-        Thickness = 2,
-    },
-},
+        Boxes = {
+            Animate = false,
+            RotationSpeed = 300,
+            Gradient = false,
+            GradientRGB1 = Color3.fromRGB(255, 255, 255),
+            GradientRGB2 = Color3.fromRGB(0, 0, 0), 
+            GradientFill = true,
+            GradientFillRGB1 = Color3.fromRGB(255, 255, 255),
+            GradientFillRGB2 = Color3.fromRGB(0, 0, 0), 
+            Filled = {
+                Enabled = false,
+                Transparency = 0.75,
+                RGB = Color3.fromRGB(0, 0, 0),
+            },
+            Full = {
+                Enabled = true,
+                RGB = Color3.fromRGB(255, 255, 255),
+                BorderColor = Color3.fromRGB(0, 0, 0),
+                Thickness = 2,
+            },
+            Corner = {
+                Enabled = false,
+                RGB = Color3.fromRGB(0, 0, 0),
+                Thickness = 2,
+            },
+        },
     },
     Connections = {
         RunService = RunService,
     },
 }
+
+local ESP = getgenv().ESP
 
 local FONT_DIR = "Trapgzz_Fonts"
 pcall(function()
@@ -1940,7 +1975,7 @@ local Gradient2 = Functions:Create("UIGradient", {
 
         local Connection
         Connection = Euphoria.RunService.RenderStepped:Connect(function()
-            if not ESP.Enabled or not plr or not plr.Parent then
+            if not getgenv().Toggles.ESP or not plr or not plr.Parent then
                 HideESP()
                 return
             end
@@ -2213,4 +2248,672 @@ end
             ScreenGui[v.Name]:Destroy()
         end
     end)
+end
+
+-- ============================================================
+-- MAIN TAB
+-- ============================================================
+
+local LocalPlayerSection = Tabs.Main:Section({Name = "Local Player", Side = "Left"})
+
+LocalPlayerSection:Toggle({
+    Name = "Instant Interact", 
+    callback = function(value)
+        setInstantInteract(value)
+    end
+})
+
+LocalPlayerSection:Toggle({
+    Name = "AltDelete", 
+    callback = function(value)
+        setClickDelete(value)
+    end
+})
+
+LocalPlayerSection:Toggle({
+    Name = "Infinite Zoom", 
+    callback = function(value)
+        setInfiniteZoom(value)
+    end
+})
+
+local NoclipToggle = LocalPlayerSection:Toggle({
+    Name = "No Clip",
+    callback = function(value)
+        NoclipEnabled = value
+        if not value then
+            Reset_Noclip()
+        end
+    end
+})
+
+-- Ahora NoclipToggle existe y podemos agregarle el Keybind
+NoclipToggle:Keybind({
+    Name = "Keybind",
+    callback = function()
+        -- Alternar el estado de Noclip
+        NoclipEnabled = not NoclipEnabled
+        if not NoclipEnabled then
+            Reset_Noclip()
+        end
+        -- Actualizar visualmente el toggle
+        if NoclipToggle.SetValue then
+            NoclipToggle:SetValue(NoclipEnabled)
+        end
+    end
+})
+
+LocalPlayerSection:Toggle({
+    Name = "Hide Name",
+    callback = function(value)
+        HideName.Enabled = value
+        applyHideName()
+    end
+})
+
+LocalPlayerSection:Textbox({
+    Name = "Hide Name Text",
+    Placeholder = "Change Your Name!",
+    Default = "TrapGoose",
+    callback = function(value)
+        HideName.NameValue = value ~= "" and value or "TrapGoose"
+        if HideName.Enabled then applyHideName() end
+    end
+})
+
+LocalPlayerSection:Button({
+    Name = "Instant Respawn",
+    callback = function()
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        root.CFrame = CFrame.new(root.Position.X, 9e9, root.Position.Z)
+    end
+})
+
+LocalPlayerSection:Button({
+    Name = "Restore Deleted",
+    callback = function()
+        RestoreAllDeleted()
+    end
+})
+
+-- ============================================================
+-- TELEPORT METHOD SECTION
+-- ============================================================
+
+local TeleportMethodSection = Tabs.Main:Section({Name = "Teleport Method", Side = "Right"})
+
+TeleportMethodSection:Dropdown({
+    Name = "Method",
+    Options = {"Tween", "Instant", "Auto Select"},
+    Default = "Auto Select",
+    callback = function(value)
+        if value == "Auto Select" then
+            getgenv().AutoSelectEnabled = true
+            UpdateTeleportMethod()
+        else
+            getgenv().AutoSelectEnabled = false
+            RuntimeState.zzzMeth = value
+        end
+    end
+})
+
+-- ============================================================
+-- AUTOFARM SECTION
+-- ============================================================
+
+local AutofarmSection = Tabs.Main:Section({Name = "Autofarm", Side = "Left"})
+
+AutofarmSection:Toggle({
+    Name = "Autofarm Cards",
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+AutofarmSection:Toggle({
+    Name = "Autofarm Boxes",
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+AutofarmSection:Toggle({
+    Name = "Autofarm Chips",
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+AutofarmSection:Toggle({
+    Name = "Autofarm Marshmallow",
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+AutofarmSection:Slider({
+    Name = "Marshmallow Value",
+    Min = 1,
+    Max = 50,
+    Default = 1,
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+-- ============================================================
+-- WEBHOOK SECTION
+-- ============================================================
+
+local WebhookSection = Tabs.Main:Section({Name = "Webhook Settings", Side = "Right"})
+
+WebhookSection:Textbox({
+    Name = "Webhook URL",
+    Placeholder = "https://discord.com/api/webhooks/...",
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+WebhookSection:Toggle({
+    Name = "Enabled",
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+WebhookSection:Slider({
+    Name = "Interval (seconds)",
+    Min = 5,
+    Max = 120,
+    Default = 30,
+    callback = function(value)
+        -- FUNCION
+    end
+})
+
+WebhookSection:Button({
+    Name = "Test Webhook",
+    callback = function()
+        -- FUNCION
+    end
+})
+
+-- ============================================================
+-- PLAYERS TAB
+-- ============================================================
+
+local PlayersListSection = Tabs.Players:Section({Name = "In-Game Players", Side = "Left"})
+
+-- AQUI: Lista / Dropdown de jugadores + lógica de UpdatePlayerList
+
+local PlayersOptionsSection = Tabs.Players:Section({Name = "Players Options", Side = "Right"})
+
+-- AQUI: Toggle Spectate, botón Teleport to Player, dropdown Status
+
+local PlayerItemsSection = Tabs.Players:Section({Name = "Player Items", Side = "Right"})
+
+-- AQUI: lo que tenías de inventario del jugador
+
+-- ============================================================
+-- TELEPORT (puedes meterlo dentro de Main o crear otra tab)
+-- ============================================================
+
+local AutoFarmStatsSection = Tabs.Main:Section({Name = "Auto Farm Stats", Side = "Left"})
+
+-- AQUI: Lista/Dropdown de Locations + callback con ApexTeleport
+
+local DynamicTeleportSection = Tabs.Main:Section({Name = "Dynamic Teleports", Side = "Right"})
+
+-- AQUI: Homeless dropdown + botón Teleport
+-- AQUI: Active ATMs dropdown + botón Teleport
+
+-- ============================================================
+-- COMBAT TAB
+-- ============================================================
+
+local SilentAimSection = Tabs.Combat:Section({Name = "Silent Aim", Side = "Left"})
+
+-- AQUI: Enable, Keybind, FOV Settings, Target Parts, Visible Check, Hit Chance, Distance Limit, Snapline
+
+local AimlockSection = Tabs.Combat:Section({Name = "Aimlock", Side = "Right"})
+
+-- AQUI: Enable, Keybind, FOV, Aim Type, Target Part, Max Distance, Smoothness, Visible Check, Snapline
+
+local GunModsSection = Tabs.Combat:Section({Name = "Gun Mods", Side = "Left"})
+
+-- AQUI: Fully Automatic, Modify Firerate, Recoil, Spread, Instant Bullet, Instant Reload
+
+local HitboxSection = Tabs.Combat:Section({Name = "Hitbox Expander", Side = "Right"})
+
+-- AQUI: Enable, Hitbox Part, Size, Color, Transparency, Safezone Check
+
+-- ============================================================
+-- VISUALS TAB
+-- ============================================================
+
+local VisualsTab = Tabs.Visuals
+
+-- ============================================================
+-- COLUMNA IZQUIERDA: ESP
+-- ============================================================
+
+local EspSection = VisualsTab:Section({
+    Name = "ESP",
+    Side = "Left"
+})
+
+-- ===== ENABLE ESP =====
+EspSection:Toggle({
+    Name = "Enable ESP",
+callback = function(value)
+    print("=== TOGGLE ESP ===")
+    print("value:", value)
+    print("ESP existe?:", ESP ~= nil)
+    if ESP then
+        ESP.Enabled = value
+        print("ESP.Enabled ahora es:", ESP.Enabled)
+    else
+        warn("ESP ES NIL")
+    end
+end
+})
+
+-- Boxes
+local boxesToggle = EspSection:Toggle({
+    Name = "Boxes",
+    Default = true,
+    callback = function(value)
+        ESP.Drawing.Boxes.Full.Enabled = value
+    end
+})
+boxesToggle:Colorpicker({
+    Name = "Box Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    callback = function(color)
+        ESP.Drawing.Boxes.Full.RGB = color
+    end
+})
+
+-- ===== FILLED BOXES =====
+local filledToggle = EspSection:Toggle({
+    Name = "Filled Boxes",
+    callback = function(value)
+        getgenv().Toggles.FilledBoxes = value
+        ESP.Drawing.Boxes.Filled.Enabled = value
+    end
+})
+filledToggle:Colorpicker({
+    Name = "Fill Color",
+    Color = Color3.fromRGB(107, 114, 238),
+    callback = function(value)
+        ESP.Drawing.Boxes.Filled.RGB = value
+    end
+})
+
+-- ===== NAMES =====
+local nameToggle = EspSection:Toggle({
+    Name = "Names",
+    Default = true,
+    callback = function(value)
+        getgenv().Toggles.Names = value
+        ESP.Drawing.Names.Enabled = value
+    end
+})
+nameToggle:Colorpicker({
+    Name = "Name Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    callback = function(value)
+        ESP.Drawing.Names.RGB = value
+    end
+})
+
+-- ===== HEALTH BARS =====
+local healthToggle = EspSection:Toggle({
+    Name = "Health Bars",
+    Default = true,
+    callback = function(value)
+        getgenv().Toggles.HealthBars = value
+        ESP.Drawing.Healthbar.Enabled = value
+    end
+})
+healthToggle:Colorpicker({
+    Name = "Health Color (Low)",
+    Color = Color3.fromRGB(200, 0, 0),
+    callback = function(value)
+        ESP.Drawing.Healthbar.GradientRGB1 = value
+    end
+})
+healthToggle:Colorpicker({
+    Name = "Health Color (High)",
+    Color = Color3.fromRGB(0, 255, 0),
+    callback = function(value)
+        ESP.Drawing.Healthbar.GradientRGB3 = value
+    end
+})
+
+-- ===== HEALTH TEXT =====
+local healthTextToggle = EspSection:Toggle({
+    Name = "Health Text",
+    Default = true,
+    callback = function(value)
+        getgenv().Toggles.HealthText = value
+        ESP.Drawing.Healthbar.HealthText = value
+    end
+})
+healthTextToggle:Colorpicker({
+    Name = "Health Text Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    callback = function(value)
+        ESP.Drawing.Healthbar.HealthTextRGB = value
+    end
+})
+
+-- ===== WEAPONS =====
+local weaponsToggle = EspSection:Toggle({
+    Name = "Weapons",
+    Default = true,
+    callback = function(value)
+        getgenv().Toggles.Weapons = value
+        ESP.Drawing.Weapons.Enabled = value
+    end
+})
+weaponsToggle:Colorpicker({
+    Name = "Weapon Color",
+    Color = Color3.fromRGB(119, 120, 255),
+    callback = function(value)
+        ESP.Drawing.Weapons.WeaponTextRGB = value
+    end
+})
+
+-- ===== DISTANCE =====
+local distanceToggle = EspSection:Toggle({
+    Name = "Distance",
+    Default = true,
+    callback = function(value)
+        getgenv().Toggles.Distance = value
+        ESP.Drawing.Distances.Enabled = value
+    end
+})
+distanceToggle:Colorpicker({
+    Name = "Distance Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    callback = function(value)
+        ESP.Drawing.Distances.RGB = value
+    end
+})
+
+-- ===== CHAMS =====
+local chamsToggle = EspSection:Toggle({
+    Name = "Chams",
+    callback = function(value)
+        getgenv().Toggles.Chams = value
+        ESP.Drawing.Chams.Enabled = value
+    end
+})
+chamsToggle:Colorpicker({
+    Name = "Chams Fill Color",
+    Color = Color3.fromRGB(119, 120, 255),
+    callback = function(value)
+        ESP.Drawing.Chams.FillRGB = value
+    end
+})
+chamsToggle:Colorpicker({
+    Name = "Chams Outline Color",
+    Color = Color3.fromRGB(119, 120, 255),
+    callback = function(value)
+        ESP.Drawing.Chams.OutlineRGB = value
+    end
+})
+
+-- ===== FLAGS =====
+EspSection:Toggle({
+    Name = "Flags (Team)",
+    callback = function(value)
+        getgenv().Toggles.Flags = value
+        ESP.Drawing.Flags.Enabled = value
+    end
+})
+
+-- ============================================================
+-- COLUMNA DERECHA: ESP SETTINGS
+-- ============================================================
+
+local SettingsSection = VisualsTab:Section({
+    Name = "ESP Settings",
+    Side = "Right"
+})
+
+SettingsSection:Toggle({
+    Name = "Animated Boxes",
+    callback = function(value)
+        getgenv().Toggles.AnimatedBoxes = value
+        ESP.Drawing.Boxes.Animate = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Dynamic Health Text",
+    Default = true,
+    callback = function(value)
+        getgenv().Toggles.DynamicHealthText = value
+        ESP.Drawing.Healthbar.Lerp = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Gradient Health Bar",
+    Default = true,
+    callback = function(value)
+        getgenv().Toggles.GradientHealthBar = value
+        ESP.Drawing.Healthbar.Gradient = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Thermal Chams",
+    callback = function(value)
+        getgenv().Toggles.ThermalChams = value
+        ESP.Drawing.Chams.Thermal = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Visible Check",
+    callback = function(value)
+        getgenv().Toggles.VisibleCheck = value
+        ESP.Drawing.Chams.VisibleCheck = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Team Check",
+    callback = function(value)
+        getgenv().Toggles.TeamCheck = value
+        ESP.TeamCheck = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Friend Check",
+    callback = function(value)
+        getgenv().Toggles.FriendCheck = value
+        ESP.Options.Friendcheck = value
+    end
+})
+
+SettingsSection:Colorpicker({
+    Name = "Friend Color",
+    Color = Color3.fromRGB(0, 255, 0),
+    callback = function(value)
+        ESP.Options.FriendcheckRGB = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Show Enemy Tag",
+    callback = function(value)
+        getgenv().Toggles.ShowEnemyTag = value
+        ESP.ShowEnemyTag = value
+    end
+})
+
+SettingsSection:Toggle({
+    Name = "Fade Out on Distance",
+    callback = function(value)
+        getgenv().Toggles.FadeOutOnDistance = value
+        ESP.FadeOut.OnDistance = value
+    end
+})
+
+SettingsSection:Slider({
+    Name = "Box Animation Speed",
+    Min = 50,
+    Max = 500,
+    Default = 300,
+    callback = function(value)
+        ESP.Drawing.Boxes.RotationSpeed = value
+    end
+})
+
+SettingsSection:Dropdown({
+    Name = "Text Font",
+    Options = {
+        "Arcade", "BuilderSans", "Code", "Pixel", "Plex",
+        "Fantasy", "FredokaOne", "Gotham", "GothamBlack",
+        "Minecraftia", "Jura", "Roboto", "RobotoMono",
+        "SourceSans", "Verdana"
+    },
+    Default = "BuilderSans",
+    callback = function(value)
+        ESP.Font = ResolveFont(value)
+    end
+})
+
+SettingsSection:Slider({
+    Name = "Text Size",
+    Min = 8,
+    Max = 24,
+    Default = 12,
+    callback = function(value)
+        ESP.FontSize = value
+    end
+})
+
+SettingsSection:Slider({
+    Name = "Max Render Distance",
+    Min = 10,
+    Max = 5000,
+    Default = 1000,
+    callback = function(value)
+        ESP.MaxDistance = value
+    end
+})
+
+-- ============================================================
+-- COLUMNA DERECHA: WORLD
+-- ============================================================
+
+local WorldSection = VisualsTab:Section({
+    Name = "World",
+    Side = "Right"
+})
+
+WorldSection:Toggle({
+    Name = "Fullbright",
+    callback = function(value)
+        WorldVisuals.Fullbright = value
+    end
+})
+
+WorldSection:Toggle({
+    Name = "No Fog",
+    callback = function(value)
+        getgenv().NoFogEnabled = value
+        if value then ApplyNoFog() end
+    end
+})
+
+WorldSection:Toggle({
+    Name = "Saturation",
+    callback = function(value)
+        WorldVisuals.SaturationEnabled = value
+    end
+})
+WorldSection:Slider({
+    Name = "Saturation Value",
+    Min = 0,
+    Max = 200,
+    Default = 50,
+    callback = function(value)
+        WorldVisuals.Saturation_Value = value / 100
+    end
+})
+
+WorldSection:Toggle({
+    Name = "Field of View",
+    callback = function(value)
+        WorldVisuals.FieldOfViewEnabled = value
+    end
+})
+WorldSection:Slider({
+    Name = "FOV Value",
+    Min = 1,
+    Max = 120,
+    Default = 70,
+    callback = function(value)
+        WorldVisuals.FieldOfViewValue = value
+    end
+})
+
+WorldSection:Toggle({
+    Name = "Stretched Resolution",
+    callback = function(value)
+        WorldVisuals.StretchEnabled = value
+    end
+})
+WorldSection:Slider({
+    Name = "Stretch Value",
+    Min = 10,
+    Max = 100,
+    Default = 70,
+    callback = function(value)
+        WorldVisuals.StretchValue = value / 100
+    end
+})
+
+local fogToggle = WorldSection:Toggle({
+    Name = "Fog Color",
+    callback = function(value)
+        WorldVisuals.FogColorEnabled = value
+    end
+})
+fogToggle:Colorpicker({
+    Name = "Fog Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    callback = function(value)
+        WorldVisuals.FogColor = value
+    end
+})
+
+local ambientToggle = WorldSection:Toggle({
+    Name = "Ambient",
+    callback = function(value)
+        WorldVisuals.AmbientEnabled = value
+    end
+})
+ambientToggle:Colorpicker({
+    Name = "Ambient Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    callback = function(value)
+        WorldVisuals.AmbientColor = value
+    end
+})
+
+Library:Configs(Window)
 end
